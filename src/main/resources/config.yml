@@ -1,6 +1,21 @@
 knockbackHorizontal: 0.4
 knockbackVertical: 0.4
+# Set to 0.0 to enable static KB
+# like on most modern 1.7/1.8
+# practice servers
+knockbackHorizontalFriction: 2.0
+knockbackVerticalFriction: 1.0
+# knockbackVerticalLimit
+# isn't used when static
+# vertical kb is enabled
 knockbackVerticalLimit: 0.4
+# Extra Horiozontal/Vertical
+# kb values are used as a multiplier
+# when static kb is enabled
 knockbackExtraHorizontal: 0.5
 knockbackExtraVertical: 0.1
 enable-knockback-resistance: false
+knockbackEnchantMultiplier: 1.0
+hurtTimeThorns: 20
+hurtTimeFallDamage: 20
+hurtTimeFireTick: 20
