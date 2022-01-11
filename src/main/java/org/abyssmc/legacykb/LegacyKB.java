@@ -17,7 +17,6 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerVelocityEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.Vector;
-import java.lang.reflect.Field;
 import java.util.HashMap;
 
 public class LegacyKB extends JavaPlugin implements Listener, CommandExecutor {
@@ -44,6 +43,7 @@ public class LegacyKB extends JavaPlugin implements Listener, CommandExecutor {
     boolean hasShields = false;
 
     HashMap<Player, Vector> playerKnockbackHashMap = new HashMap<>();
+    HashMap<Player, Integer> playerHurtTimeHashMap = new HashMap<>();
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onPlayerVelocityEvent(PlayerVelocityEvent event) {
@@ -56,40 +56,34 @@ public class LegacyKB extends JavaPlugin implements Listener, CommandExecutor {
     public void onEntityDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player)) return;
         Player victim = (Player) event.getEntity();
-        try {
-            if (event.getCause().equals(EntityDamageEvent.DamageCause.FIRE_TICK) || event.getCause().equals(EntityDamageEvent.DamageCause.FALL)) {
-                int temp = event.getCause().equals(EntityDamageEvent.DamageCause.FIRE_TICK) ? hurtTimeFireTick : hurtTimeFallDamage;
-                Field field = victim.getClass().getSuperclass().getSuperclass().getSuperclass().getDeclaredField("entity");
-                field.setAccessible(true);
-                Class clazz = field.get(victim).getClass().getSuperclass().getSuperclass().getSuperclass();
-                System.out.println("fall/fire" + String.valueOf((int) clazz.getField("X").get(field.get(victim))));
-                clazz.getField("X").setInt(field.get(victim), temp);
-            }
-        } catch (Exception e) { e.printStackTrace(); }
+        if (playerHurtTimeHashMap.containsKey(victim)) {
+            victim.setNoDamageTicks(playerHurtTimeHashMap.get(victim));
+            playerHurtTimeHashMap.remove(victim);
+        }
+
+        if (event.getCause().equals(EntityDamageEvent.DamageCause.FIRE_TICK) || event.getCause().equals(EntityDamageEvent.DamageCause.FALL)) {
+            int temp = event.getCause().equals(EntityDamageEvent.DamageCause.FIRE_TICK) ? hurtTimeFireTick : hurtTimeFallDamage;
+            playerHurtTimeHashMap.put(victim, victim.getMaximumNoDamageTicks());
+            Bukkit.getScheduler().runTask(this, () -> victim.setNoDamageTicks(temp));
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onEntityDamageEntity(EntityDamageByEntityEvent event) {
-        // Check if sword PvP, not PvE or EvE
+        // Check if PvP, not PvE or EvE
 
         if (!(event.getEntity() instanceof Player)) return;
         if (hasShields && event.getDamage(EntityDamageEvent.DamageModifier.BLOCKING) != 0) return;
         Player victim = (Player) event.getEntity();
-        // reflection mania
-        // there r definitely less retarded ways to achieve this but whatever, at least im learning about fields and stuff now
-        try {
-            if (event.getCause().equals(EntityDamageEvent.DamageCause.THORNS)) {
-                Field field = victim.getClass().getSuperclass().getSuperclass().getSuperclass().getDeclaredField("entity");
-                field.setAccessible(true); // this is cul
-                Class clazz = field.get(victim).getClass().getSuperclass().getSuperclass().getSuperclass();
-                System.out.println("thorns" + String.valueOf((int) clazz.getField("X").get(field.get(victim))));
-                clazz.getField("X").setInt(field.get(victim), hurtTimeThorns);
-            }
-        } catch (Exception e) { e.printStackTrace(); }
+
+        if (event.getCause().equals(EntityDamageEvent.DamageCause.THORNS)) {
+            playerHurtTimeHashMap.put(victim, victim.getMaximumNoDamageTicks());
+            Bukkit.getScheduler().runTask(this, () -> victim.setNoDamageTicks(hurtTimeThorns));
+        }
 
         // Disable netherite kb, the knockback resistance attribute makes the velocity event not be called
         // Also it makes players sometimes just not take any knockback, and reduces knockback
-        // This affects both PvP and PvE, so put it above the PvP check
+        // This affects both PvP and PvE, so put it under the PvP check
         // We technically don't have to check the version but bad server jars might break if we do
         if (versionHasNetherite && !netheriteKnockbackResistance)
             for (AttributeModifier modifier : victim.getAttribute(Attribute.GENERIC_KNOCKBACK_RESISTANCE).getModifiers())
